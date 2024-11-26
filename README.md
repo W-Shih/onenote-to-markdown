@@ -49,3 +49,7 @@ print(win32com.__gen_path__)
 ```
 
 2. Delete the `gen_py` folder indicated in the output of the previous step.
+
+## Forked from
+
+This repo is inspired by the youtube video [Python Update - Convert OneNote to Markdown (and Obsidian.md)](https://www.youtube.com/watch?v=mYbiT63Bkns) and forked from [onenote-to-markdown](https://gitlab.com/pagekey/edu/onenote-to-markdown). I will some modifications to the script to better suit my needs.
