@@ -67,6 +67,16 @@ def fix_image_names(md_path, image_names):
             f_tmp.write(body_md)
     shutil.move(tmp_path, md_path)
 
+def remove_html_image_dimensions(md_path):
+    tmp_path = md_path + '.tmp'
+    i = 0
+    with open(md_path, 'r', encoding='utf-8') as f_md:
+        with open(tmp_path, 'w', encoding='utf-8') as f_tmp:
+            body_md = f_md.read()
+            body_md = re.sub("style=\"width:[0-9.]+in;height:[0-9.]+in\"", "", body_md)
+            f_tmp.write(body_md)
+    shutil.move(tmp_path, md_path)
+
 def handle_page(onenote, elem, path, i):
     safe_name = safe_str("%s_%s" % (str(i).zfill(3), elem.attrib['name']))
     if not should_handle(os.path.join(path, safe_name)):
@@ -96,6 +106,7 @@ def handle_page(onenote, elem, path, i):
         image_names = extract_pdf_pictures(path_pdf, path_assets, safe_name)
         # Replace image names in markdown file
         fix_image_names(path_md, image_names)
+        remove_html_image_dimensions(path_md)
     except pywintypes.com_error as e:
         log("!!WARNING!! Page Failed: %s" % path_md)
     except Exception as e:
