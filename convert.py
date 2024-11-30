@@ -63,7 +63,7 @@ def fix_image_names(md_path, image_names):
         with open(tmp_path, 'w', encoding='utf-8') as f_tmp:
             body_md = f_md.read()
             for i,name in enumerate(image_names):
-                body_md = re.sub("media\/image" + str(i+1) + "\.[a-zA-ZА-Яа-яЁё]+", name, body_md)
+                body_md = re.sub("media\/image" + str(i+1) + "\.[a-zA-ZА-Яа-яЁё]+", ASSETS_DIR + "/" + name, body_md)
             f_tmp.write(body_md)
     shutil.move(tmp_path, md_path)
 
@@ -89,7 +89,7 @@ def handle_page(onenote, elem, path, i):
         onenote.Publish(elem.attrib['ID'], path_docx, win32.constants.pfWord, "")
         # Convert docx to markdown
         log("Generating markdown: %s" % path_md)
-        os.system('pandoc.exe -i "%s" -o "%s" -t markdown-simple_tables-multiline_tables-grid_tables --wrap=none' % (path_docx, path_md))
+        os.system('pandoc.exe -i "%s" -o "%s" -f docx -t gfm --wrap=none --markdown-headings=atx' % (path_docx, path_md))
         # Create pdf (for the picture assets)
         onenote.Publish(elem.attrib['ID'], path_pdf, 3, "")
         # Output picture assets to folder
@@ -98,26 +98,33 @@ def handle_page(onenote, elem, path, i):
         fix_image_names(path_md, image_names)
     except pywintypes.com_error as e:
         log("!!WARNING!! Page Failed: %s" % path_md)
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
     # Clean up docx, html
     if os.path.exists(path_docx):
         os.remove(path_docx)
     if os.path.exists(path_pdf):
         os.remove(path_pdf)
 
-def handle_element(onenote, elem, path='', i=0):
+def handle_element(onenote, elem, path='', i=0, target_notebook=None, target_page=None):
     if elem.tag.endswith('Notebook'):
+        notebook_name = elem.attrib['name']
+        if target_notebook and notebook_name != target_notebook:
+            return
         hier2 = onenote.GetHierarchy(elem.attrib['ID'], win32.constants.hsChildren, "")
         for i,c2 in enumerate(ElementTree.fromstring(hier2)):
-            handle_element(onenote, c2, os.path.join(path, safe_str(elem.attrib['name'])), i)
+            handle_element(onenote, c2, os.path.join(path, safe_str(elem.attrib['name'])), i, target_notebook, target_page)
     elif elem.tag.endswith('Section'):
         hier2 = onenote.GetHierarchy(elem.attrib['ID'], win32.constants.hsPages, "")
         for i,c2 in enumerate(ElementTree.fromstring(hier2)):
-            handle_element(onenote, c2, os.path.join(path, safe_str(elem.attrib['name'])), i)
+            handle_element(onenote, c2, os.path.join(path, safe_str(elem.attrib['name'])), i, target_notebook, target_page)
     elif elem.tag.endswith('SectionGroup') and (not elem.attrib['name'].startswith('OneNote_RecycleBin') or PROCESS_RECYCLE_BIN):
         hier2 = onenote.GetHierarchy(elem.attrib['ID'], win32.constants.hsSections, "")
         for i,c2 in enumerate(ElementTree.fromstring(hier2)):
-            handle_element(onenote, c2, os.path.join(path, safe_str(elem.attrib['name'])), i)
+            handle_element(onenote, c2, os.path.join(path, safe_str(elem.attrib['name'])), i, target_notebook, target_page)
     elif elem.tag.endswith('Page'):
+        if target_page and elem.attrib['name'] != target_page:
+            return
         try:
             handle_page(onenote, elem, path, i)
         except:
@@ -125,14 +132,17 @@ def handle_element(onenote, elem, path='', i=0):
 
 if __name__ == "__main__":
     try:
+        target_notebook, target_page = None, None
+        if len(sys.argv) > 1:
+            target_notebook = sys.argv[1]
+        if len(sys.argv) > 2:
+            target_page = sys.argv[2]
+
         onenote = win32.gencache.EnsureDispatch("OneNote.Application.12")
-
         hier = onenote.GetHierarchy("", win32.constants.hsNotebooks, "")
-
         root = ElementTree.fromstring(hier)
         for child in root:
-            handle_element(onenote, child)
-
+            handle_element(onenote, child, target_notebook=target_notebook, target_page=target_page)
     except pywintypes.com_error as e:
         traceback.print_exc()
         log("!!!Error!!! Hint: Make sure OneNote is open first.")
