@@ -1,2 +1,2 @@
-pywin32
 pymupdf
+pywin32
